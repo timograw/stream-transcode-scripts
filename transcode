@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# Installation
+# This script requires the following dependencies:
+# - ffmpeg (with libx264 and libfdk_aac!!!)
+# - jq
+# - mediainfo
+# - bc
+
+# Configuration
+max_video_bitrate=4000000
+
+ffmpeg_videocodec_copy="copy"
+ffmpeg_audiocodec_copy="copy"
+
+ffmpeg_videocodec_x264="libx264 -crf 21"
+ffmpeg_audiocodec_aac="libfdk_aac -af \"aresample=async=1:first_pts=0\" -vbr 4"
+
+# Start of script
+
+source_filename="$1"
+
+source_filename_no_ext=$(echo "$source_filename" | sed -e 's/\.[^.]*$//')
+
+mediainfo=$(mediainfo --Output=JSON "$source_filename")
+
+source_audio_codec=$(jq -crM '.media.track[] | select(.["@type"]=="Audio").Format' <<< "$mediainfo")
+source_audio_language=$(jq -crM '.media.track[] | select(.["@type"]=="Audio").Language' <<< "$mediainfo")
+source_audio_channels=$(jq -crM '.media.track[] | select(.["@type"]=="Audio").Channels' <<< "$mediainfo")
+source_audio_bitrate=$(jq -crM '.media.track[] | select(.["@type"]=="Audio").BitRate' <<< "$mediainfo")
+source_audio_bitrate_mode=$(jq -crM '.media.track[] | select(.["@type"]=="Audio").BitRate_Mode' <<< "$mediainfo")
+source_audio_bitrate_kbs=$(bc <<< "$source_audio_bitrate / 1024")
+
+source_video_codec=$(jq -crM '.media.track[] | select(.["@type"]=="Video").Format' <<< "$mediainfo")
+source_video_bitrate=$(jq -crM '.media.track[] | select(.["@type"]=="Video").BitRate' <<< "$mediainfo")
+source_video_bitrate_mode=$(jq -crM '.media.track[] | select(.["@type"]=="Video").BitRate_Mode' <<< "$mediainfo")
+source_video_bitrate_kbs=$(bc <<< "$source_video_bitrate / 1024")
+source_video_width=$(jq -crM '.media.track[] | select(.["@type"]=="Video").Width' <<< "$mediainfo")
+source_video_height=$(jq -crM '.media.track[] | select(.["@type"]=="Video").Height' <<< "$mediainfo")
+source_video_framerate=$(jq -crM '.media.track[] | select(.["@type"]=="Video").FrameRate' <<< "$mediainfo")
+
+echo "Source codecs:"
+echo "  video: $source_video_codec, $source_video_bitrate_kbs kb/s $source_video_bitrate_mode, $source_video_width x $source_video_height @ $source_video_framerate fps"
+echo "  audio: $source_audio_codec, $source_audio_bitrate_kbs kb/s $source_audio_bitrate_mode, $source_audio_language, $source_audio_channels ch"
+
+start=`date +%s`
+
+if [ "$source_audio_codec" = "AAC" ]; then
+	ffmpeg_audiocodec=$ffmpeg_audiocodec_copy
+	ffmpeg_audiocodec_reason="Already AAC -> Nothing to do"
+else
+	ffmpeg_audiocodec=$ffmpeg_audiocodec_aac
+	ffmpeg_audiocodec_reason="Not AAC -> Recoding"
+fi;
+
+if [ "$source_video_codec" = "AVC" ]; then
+	if [ "$source_video_bitrate" \> "$max_video_bitrate" ]; then
+		ffmpeg_videocodec=$ffmpeg_videocodec_x264
+		ffmpeg_videocodec_reason="Bitrate is too high -> Recoding"
+	else
+		ffmpeg_videocodec=$ffmpeg_videocodec_copy
+		ffmpeg_videocodec_reason="Already AVC/h.264 -> Nothing to do"
+	fi;
+else
+	ffmpeg_videocodec=$ffmpeg_videocodec_copy
+	ffmpeg_videocodec_reason="Already AVC/h.264 -> Nothing to do"
+fi;
+
+
+echo "Transcoding file..."
+echo "  video: $ffmpeg_videocodec_reason"
+echo "  videocodec: \"$ffmpeg_videocodec\""
+echo "  audio: $ffmpeg_audiocodec_reason"
+echo "  audiocodec: \"$ffmpeg_audiocodec\""
+
+echo "Starting ffmpeg..."
+# Use previously determined audio and video codecs
+# Also use movflags faststart to create streamable mp4
+ffmpeg -i "$source_filename" -vcodec $ffmpeg_videocodec -acodec $ffmpeg_audiocodec -movflags faststart "$souce_filename_no_ext"-encoding.mp4
+
+echo "Removing original file"
+rm "$source_filename"
+
+echo "Renaming encoded file"
+mv "$source_filename_no_ext"-encoding.mp4 "$source_filename_no_ext".mp4
+
+end=`date +%s`
+duration=$((($(date +%s)-$start)/60))
+
+echo "Done in $duration minutes"
