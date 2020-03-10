@@ -8,7 +8,7 @@
 # - bc
 
 # Configuration
-max_video_bitrate=4000000
+max_video_bitrate="4000000"
 
 ffmpeg_videocodec_copy="copy"
 ffmpeg_audiocodec_copy="copy"
@@ -39,7 +39,7 @@ source_video_width=$(jq -crM '.media.track[] | select(.["@type"]=="Video").Width
 source_video_height=$(jq -crM '.media.track[] | select(.["@type"]=="Video").Height' <<< "$mediainfo")
 source_video_framerate=$(jq -crM '.media.track[] | select(.["@type"]=="Video").FrameRate' <<< "$mediainfo")
 
-echo "Source codecs:"
+echo "Source:"
 echo "  video: $source_video_codec, $source_video_bitrate_kbs kb/s $source_video_bitrate_mode, $source_video_width x $source_video_height @ $source_video_framerate fps"
 echo "  audio: $source_audio_codec, $source_audio_bitrate_kbs kb/s $source_audio_bitrate_mode, $source_audio_language, $source_audio_channels ch"
 
@@ -54,7 +54,7 @@ else
 fi;
 
 if [ "$source_video_codec" = "AVC" ]; then
-	if [ "$source_video_bitrate" \> "$max_video_bitrate" ]; then
+	if [ "$source_video_bitrate" -gt "$max_video_bitrate" ]; then
 		ffmpeg_videocodec=$ffmpeg_videocodec_x264
 		ffmpeg_videocodec_reason="Bitrate is too high -> Recoding"
 	else
@@ -74,17 +74,17 @@ echo "  audio: $ffmpeg_audiocodec_reason"
 echo "  audiocodec: \"$ffmpeg_audiocodec\""
 
 echo "Starting ffmpeg..."
+temporary_filename="$source_filename_no_ext"-encoding.mp4
 # Use previously determined audio and video codecs
 # Also use movflags faststart to create streamable mp4
-echo ffmpeg -i "$source_filename" -vcodec $ffmpeg_videocodec -acodec $ffmpeg_audiocodec -movflags faststart "$source_filename_no_ext"-encoding.mp4
-ffmpeg -i "$source_filename" -vcodec $ffmpeg_videocodec -acodec $ffmpeg_audiocodec -movflags faststart "$source_filename_no_ext"-encoding.mp4
+ffmpeg -v quiet -stats -i "$source_filename" -vcodec $ffmpeg_videocodec -acodec $ffmpeg_audiocodec -movflags faststart "$temporary_filename"
 
-if [ -f "$souce_filename_no_ext"-encoding.mp4 ]; then
+if [ -f "$temporary_filename" ]; then
 	echo "Removing original file"
 	rm "$source_filename"
 	
 	echo "Renaming encoded file"
-	mv "$source_filename_no_ext"-encoding.mp4 "$source_filename_no_ext".mp4
+	mv "$temporary_filename" "$source_filename_no_ext".mp4
 else
 	echo "Transcoding seems to have failed"
 fi;
