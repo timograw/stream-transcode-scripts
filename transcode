@@ -24,6 +24,9 @@ source_filename_no_ext=$(echo "$source_filename" | sed -e 's/\.[^.]*$//')
 
 mediainfo=$(mediainfo --Output=JSON "$source_filename")
 
+source_duration_raw=$(jq -crM '.media.track[] | select(.["@type"]=="General").Duration' <<< "$mediainfo")
+source_duration=$(date -ud "@$source_duration_raw" +'%Hh %Mm %Ss')
+
 source_audio_codec=$(jq -crM '.media.track[] | select(.["@type"]=="Audio").Format' <<< "$mediainfo")
 source_audio_language=$(jq -crM '.media.track[] | select(.["@type"]=="Audio").Language' <<< "$mediainfo")
 source_audio_channels=$(jq -crM '.media.track[] | select(.["@type"]=="Audio").Channels' <<< "$mediainfo")
@@ -40,7 +43,7 @@ source_video_height=$(jq -crM '.media.track[] | select(.["@type"]=="Video").Heig
 source_video_framerate=$(jq -crM '.media.track[] | select(.["@type"]=="Video").FrameRate' <<< "$mediainfo")
 
 echo "Source:"
-echo "  video: $source_video_codec, $source_video_bitrate_kbs kb/s $source_video_bitrate_mode, $source_video_width x $source_video_height @ $source_video_framerate fps"
+echo "  video: $source_video_codec, $source_video_bitrate_kbs kb/s $source_video_bitrate_mode, $source_video_width x $source_video_height @ $source_video_framerate fps, $source_duration"
 echo "  audio: $source_audio_codec, $source_audio_bitrate_kbs kb/s $source_audio_bitrate_mode, $source_audio_language, $source_audio_channels ch"
 
 start=`date +%s`
