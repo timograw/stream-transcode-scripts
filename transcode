@@ -8,12 +8,12 @@
 # - bc
 
 # Configuration
-max_video_bitrate="4000000"
+max_video_bitrate="5750000"
 
 ffmpeg_videocodec_copy="copy"
 ffmpeg_audiocodec_copy="copy"
 
-ffmpeg_videocodec_x264="libx264 -crf 21"
+ffmpeg_videocodec_x264="libx264 -crf 20"
 ffmpeg_audiocodec_aac="libfdk_aac -af aresample=async=1:first_pts=0 -vbr 4"
 
 # Start of script
@@ -42,8 +42,9 @@ source_video_width=$(jq -crM '.media.track[] | select(.["@type"]=="Video").Width
 source_video_height=$(jq -crM '.media.track[] | select(.["@type"]=="Video").Height' <<< "$mediainfo")
 source_video_framerate=$(jq -crM '.media.track[] | select(.["@type"]=="Video").FrameRate' <<< "$mediainfo")
 
-echo "Source:"
-echo "  video: $source_video_codec, $source_video_bitrate_kbs kb/s $source_video_bitrate_mode, $source_video_width x $source_video_height @ $source_video_framerate fps, $source_duration"
+echo "Source: $source_filename"
+echo "  info: $source_duration"
+echo "  video: $source_video_codec, $source_video_bitrate_kbs kb/s $source_video_bitrate_mode, $source_video_width x $source_video_height @ $source_video_framerate fps"
 echo "  audio: $source_audio_codec, $source_audio_bitrate_kbs kb/s $source_audio_bitrate_mode, $source_audio_language, $source_audio_channels ch"
 
 start=`date +%s`
@@ -65,8 +66,8 @@ if [ "$source_video_codec" = "AVC" ]; then
 		ffmpeg_videocodec_reason="Already AVC/h.264 -> Nothing to do"
 	fi;
 else
-	ffmpeg_videocodec=$ffmpeg_videocodec_copy
-	ffmpeg_videocodec_reason="Already AVC/h.264 -> Nothing to do"
+	ffmpeg_videocodec=$ffmpeg_videocodec_x264
+	ffmpeg_videocodec_reason="Not h.264 -> Recoding"
 fi;
 
 
